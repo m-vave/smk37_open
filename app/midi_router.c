@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only WITH GPL-3.0-linking-exception */
 #include "instrument.h"
 #include "fm1_engine_control.h"
+#include "smk37_controls.h"
 #include <string.h>
 #ifdef FM1_HOST_TEST
 #include <stdatomic.h>
@@ -12,7 +13,7 @@
 /* Device preferences, not project data: 4 channel nibbles, 8 two-bit modes,
  * ports/local/clock/live flags, and Thru/source-clock fields. */
 static struct groove_midi_config config;
-enum { LOCAL_OFF = 8, CLOCK_OUT = 16, LIVE_OUT = 32, SEQ_OFF = 64, QUEUE = 128 };
+enum { LOCAL_OFF = 8, CLOCK_OUT = 16, LIVE_OUT = 32, SEQ_OFF = 64, PAD_CC = 128, QUEUE = 128 };
 enum { ARP_OWNER = 8, LIVE_OWNER = 16, THRU_OWNER = 24, OWNERS = 40 };
 struct events { WORD read, write, lost; unsigned seen; uint32_t data[QUEUE]; } __attribute__((aligned(32)));
 /* One producer per audio owner and one for the MIDI routing task. */
@@ -57,7 +58,7 @@ void groove_midi_defaults(struct groove_midi_config *c)
 }
 int groove_midi_config_valid(const struct groove_midi_config *c)
 {
-    if ((c->flags & 0x80U) || (c->thru & 0x80U) || ((c->thru >> 3) & 3U) == 3) return 0;
+    if ((c->thru & 0x80U) || ((c->thru >> 3) & 3U) == 3) return 0;
     for (unsigned t = 0; t < 8; ++t) if (((c->mode[t >> 2] >> (2U * (t & 3U))) & 3U) == 3) return 0;
     return 1;
 }
@@ -136,8 +137,17 @@ unsigned groove_midi_setting(unsigned track, unsigned parameter)
     case 7: return (config.thru >> 3) & 3U;
     case 8: return config.thru & 7U;
     case 9: return (config.flags & SEQ_OFF) ? ((config.flags & CLOCK_OUT) ? 2 : 0) : 1;
+    case 10: return !!(config.flags & PAD_CC);
     default: return 0;
     }
+}
+unsigned groove_midi_pad_cc(void) { return !!(config.flags & PAD_CC); }
+void groove_midi_pad_cc_set(unsigned on)
+{
+    struct groove_midi_config c; groove_midi_config_read(&c);
+    uint8_t flags = (uint8_t)(on ? (c.flags | PAD_CC) : (c.flags & ~PAD_CC));
+    if (flags == c.flags) return;
+    c.flags = flags; groove_midi_config_apply(&c);
 }
 static FM1_AUDIO_CODE void enqueue(unsigned lane, unsigned owner, unsigned ports, unsigned status, unsigned a, unsigned b)
 {
@@ -352,6 +362,20 @@ void groove_midi_fader(unsigned track, unsigned value)
 {
     if (!(config.flags & LIVE_OUT)) return;
     uint8_t m[3] = {(uint8_t)(0xb0U | channel(track)), 7, (uint8_t)value};
+    send_event(LIVE_OWNER + track, config.flags & 7U, m);
+}
+void groove_midi_pad_cc_value(unsigned controller, unsigned value)
+{
+    /* Pads 1..16 own CC 1..16. A track that receives on the controller's
+     * channel forwards it to its output channel, exactly as a key would.
+     * LIVE_OUT is the existing "KEY OUT" switch; LOCAL_OFF silences output. */
+    if (!(config.flags & PAD_CC) || controller >= 16U) return;
+    if ((config.flags & (LOCAL_OFF | LIVE_OUT)) != LIVE_OUT) return;
+    /* The Pad instrument's track is where its CC would be recorded; send on
+     * that track alone so a shared input channel cannot duplicate the CC. */
+    unsigned track = smk37_performance_track(1);
+    if (groove_track_role(track) == GROOVE_TRACK_OFF) return;
+    uint8_t m[3] = {(uint8_t)(0xb0U | channel(track)), (uint8_t)(controller + 1U), (uint8_t)value};
     send_event(LIVE_OWNER + track, config.flags & 7U, m);
 }
 int groove_midi_clock_accept(unsigned source, uint8_t status)

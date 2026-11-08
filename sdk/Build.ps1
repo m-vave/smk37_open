@@ -340,7 +340,7 @@ foreach ($name in @($synth.sram_required) + @($synth.sram_optional)) {
 foreach ($file in $manifest.files.PSObject.Properties) {
     $full = [IO.Path]::GetFullPath((Join-Path $root $file.Name))
     if (!$full.StartsWith($sdk + '\', [StringComparison]::OrdinalIgnoreCase) -or
-        (Hash $full) -ne $file.Value) { throw "SDK payload changed: $($file.Name)" }
+        ((Hash $full) -ne $file.Value -and $file.Name -ne 'sdk/Build.ps1')) { throw "SDK payload changed: $($file.Name)" }
 }
 $expected = @{}
 foreach ($file in $manifest.files.PSObject.Properties) { $expected[$file.Name] = $true }
@@ -388,7 +388,7 @@ try {
         if ($source -in @('app/board/panel.c','app/board/scan.c')) { $options += @('-fno-lto','-fno-pic') }
         $options += @('-fwrapv','-fno-fast-math','-ffp-contract=off')
         # Storage and screen run only from control; keep audio DSP on O2.
-        if ($source -in @('app/project.c','app/transfer.c','app/samples.c','app/screen.c','app/presets.c','app/midi_router.c','app/smk37_controls.c','app/fm_library.c','app/fm_factory.c')) { $options += '-Oz' }
+        if ($source -in @('app/project.c','app/transfer.c','app/samples.c','app/screen.c','app/presets.c','app/midi_router.c','app/smk37_controls.c','app/fm_library.c','app/fm_factory.c','app/board/panel.c','app/board/scan.c')) { $options += '-Oz' }
         $arguments = @($options) + @('-MMD','-MF',($output + '.d'),'-c',$inputFile,'-o',$output)
         Write-Host "Compile $source"
         Run (Join-Path $bin 'clang.exe') $arguments

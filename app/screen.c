@@ -167,11 +167,13 @@ static uint32_t boot_started;
 static const char *const seq_pages[] = {"1/7 BASIC", "2/7 STEP DETAILS", "3/7 RHYTHM/REC", "4/7 LOCKS", "5/7 SYNC / LOOP", "6/7 MIDI TRACK", "7/7 MIDI OUTPUT"};
 /* Keep input and output channels together; output switches are global. */
 /* 10 is the input-channel preference; 255 marks an unused control. */
-static const uint8_t seq_midi_parameters[2][4] = {{10,1,0,2},{9,4,255,255}};
-static const uint8_t seq_midi_limits[2][4] = {{15,15,2,7},{2,1,0,0}};
+static const uint8_t seq_midi_parameters[2][4] = {{10,1,0,2},{9,4,255,11}};
+static const uint8_t seq_midi_limits[2][4] = {{15,15,2,7},{2,1,0,1}};
 static const char *const track_modes[] = {"PROJECT", "LIVE", "OFF"};
 static const char *const midi_modes[] = {"LOCAL", "BOTH", "MIDI"};
 static const char *const seq_outputs[] = {"OFF", "ON", "CLOCK"};
+/* Pad pressure either follows the Pad note or sends CC 1..16 for Pads 1..16. */
+static const char *const pad_modes[] = {"NOTE", "CC 1-16"};
 static unsigned rec_down, rec_used;
 static uint32_t rec_ms;
 static int octave;
@@ -1527,7 +1529,7 @@ static __attribute__((noinline, cold, minsize)) void draw_page_body(const struct
             } else if (col == 2) decimal(value, v->next_length, 1);
             else { static const char *const sources[] = {"AUTO", "USB", "BLE", "DIN"}; strcpy(value, sources[groove_midi_setting(track,6)]); }
         } else if (visible == STEPS && seq_page >= 5) {
-            static const char *const labels[2][4] = {{"IN CH", "OUT CH", "SEQ", "OUT PORT"}, {"SEQ OUT", "KEY OUT", "", ""}};
+            static const char *const labels[2][4] = {{"IN CH", "OUT CH", "SEQ", "OUT PORT"}, {"SEQ OUT", "KEY OUT", "", "PAD MODE"}};
             unsigned parameter = seq_midi_parameters[seq_page - 5][col], setting = groove_midi_setting(track,parameter);
             label = labels[seq_page - 5][col];
             if (!parameter) strcpy(value,midi_modes[setting]);
@@ -1535,6 +1537,7 @@ static __attribute__((noinline, cold, minsize)) void draw_page_body(const struct
             else if (parameter == 2) strcpy(value,setting ? "ALL" : "OFF");
             else if (parameter == 10) decimal(value,groove_midi_input_channel(track)+1,1);
             else if (parameter == 9) strcpy(value,seq_outputs[setting]);
+            else if (parameter == 11) strcpy(value,pad_modes[setting]);
             else if (parameter == 255) { value[0] = 0; color = BACK; }
             else strcpy(value,setting ? "ON" : "OFF");
         } else if (visible == MIX) {
