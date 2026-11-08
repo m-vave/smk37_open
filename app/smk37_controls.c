@@ -128,6 +128,12 @@ static void play(struct held_note *held,unsigned note,unsigned velocity,unsigned
 static void pressure(unsigned id,unsigned value)
 {
     groove_midi_poll();
+    /* CC mode releases the Pad note at contact and reports the strike as a
+     * controller, so the pad plays nothing locally and still reaches MIDI. */
+    if(groove_midi_pad_cc()) {
+        if(pad_pressure[id]!=value) { pad_pressure[id]=value; groove_midi_pad_cc_value(id,value); }
+        return;
+    }
     if(held_notes[37+id].note>=128)return;
     unsigned channel=held_notes[37+id].channel,bit=1U<<channel;
     if(pad_pressure[id]==value && !(pressure_dirty&bit))return;
@@ -215,7 +221,9 @@ void smk37_control_event(unsigned kind,unsigned id,int value)
                 unsigned track=smk37_performance_track(1);
                 unsigned count=groove_pad_count(track);
                 unsigned note=count?groove_pad_note(track,id):48+id+12*smk37_performance_octave(1);
-                play(&held_notes[37+id],note,(unsigned)value,track,0);
+                /* CC mode keeps the Pad silent; the scan reports its strike
+                 * through SMK37_PRESSURE as CC 1..16. */
+                if(!groove_midi_pad_cc())play(&held_notes[37+id],note,(unsigned)value,track,0);
             }
         }
         if(previous!=pad_navigation[id]) {

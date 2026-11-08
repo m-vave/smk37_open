@@ -707,7 +707,7 @@ void groove_settings_clock(unsigned mode)
 }
 void groove_settings_midi(unsigned track, unsigned parameter, int delta)
 {
-    static const uint8_t limits[] = {2,15,7,1,1,1,3,2,7,2};
+    static const uint8_t limits[] = {2,15,7,1,1,1,3,2,7,2,1};
     if (track >= 8 || parameter >= sizeof limits || !delta) return;
     unsigned old = groove_midi_setting(track, parameter);
     unsigned limit=limits[parameter], low=0;
@@ -731,7 +731,8 @@ void groove_settings_midi(unsigned track, unsigned parameter, int delta)
     else if (parameter == 6) c.thru = (uint8_t)((c.thru & ~96U) | (unsigned)value << 5);
     else if (parameter == 7) c.thru = (uint8_t)((c.thru & ~24U) | (unsigned)value << 3);
     else if (parameter == 8) c.thru = (uint8_t)((c.thru & ~7U) | ((unsigned)value & fm1_midi_output_ports()));
-    else c.flags = (uint8_t)((c.flags & ~80U) | (value == 1 ? 0 : 64U) | (value ? 16U : 0));
+    else if (parameter == 9) c.flags = (uint8_t)((c.flags & ~80U) | (value == 1 ? 0 : 64U) | (value ? 16U : 0));
+    else c.flags = (uint8_t)((c.flags & ~128U) | (value ? 128U : 0));
     if (!memcmp(&settings.midi, &c, sizeof c)) return;
     groove_midi_config_apply(&c); settings.midi = c;
     if (parameter == 6) groove_settings_clock(GROOVE_CLOCK_MIDI);

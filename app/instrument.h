@@ -368,6 +368,11 @@ void groove_midi_panic(void);
 int groove_midi_local(const uint8_t *message, size_t bytes);
 void groove_midi_fader(unsigned track, unsigned value);
 unsigned groove_midi_setting(unsigned track, unsigned parameter);
+/* Pad pressure as a controller: 0 sends channel pressure for the Pad note,
+ * 1 sends CC 1..16 for Pads 1..16 and leaves the note untouched. */
+unsigned groove_midi_pad_cc(void);
+void groove_midi_pad_cc_set(unsigned on);
+void groove_midi_pad_cc_value(unsigned controller, unsigned value);
 void groove_settings_midi(unsigned track, unsigned parameter, int delta);
 /* parameter 0 role, 1 input channel. Changes retain all eight project rows. */
 int groove_settings_track(unsigned track, unsigned parameter, int delta);
